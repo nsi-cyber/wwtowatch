@@ -2,9 +2,9 @@ package data.source
 
 import data.Constants.BASE_LANGUAGE
 import data.Constants.IMDB_BASE_URL
-import data.model.BaseResponse
 import data.model.movieDetail.MovieDetailResponse
 import data.model.popularMoviesList.PopularMoviesListResponse
+import data.model.searchResultList.SearchResultListResponse
 import data.model.showDetail.ShowDetailResponse
 import data.model.topRatedShowsList.TopRatedShowsListResponse
 import io.ktor.client.HttpClient
@@ -18,7 +18,7 @@ class ImdbApiService(private val client: HttpClient) {
 
 
 //Movies
-    suspend fun getMovieDetail(movieId: Int): BaseResponse<MovieDetailResponse> {
+    suspend fun getMovieDetail(movieId: Int): MovieDetailResponse {
         return client.get(IMDB_BASE_URL.plus("movie/${movieId}")){
             parameter("language", BASE_LANGUAGE)
         }.body()
@@ -31,16 +31,23 @@ class ImdbApiService(private val client: HttpClient) {
         }.body()
     }
 
+    suspend fun getSearchResults(query:String,page: Int): SearchResultListResponse {
+        return client.get(IMDB_BASE_URL.plus("search/multi")){
+            parameter("query", query)
+            parameter("page", page)
+        }.body()
+    }
+
 
 
     //Shows
-    suspend fun getShowDetail(showId: Int): BaseResponse<ShowDetailResponse> {
+    suspend fun getShowDetail(showId: Int):ShowDetailResponse {
         return client.get(IMDB_BASE_URL.plus("tv/${showId}")){
             parameter("language", BASE_LANGUAGE)
         }.body()
     }
 
-    suspend fun getTopRatedShows(page: Int): BaseResponse<TopRatedShowsListResponse> {
+    suspend fun getTopRatedShows(page: Int): TopRatedShowsListResponse {
         return client.get(IMDB_BASE_URL.plus("tv/top_rated")){
             parameter("language", BASE_LANGUAGE)
             parameter("page", page)
