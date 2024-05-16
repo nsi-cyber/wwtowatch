@@ -1,0 +1,6 @@
+package data.model.showDetail
+
+data class Genre(
+    val id: Int,
+    val name: String
+)
