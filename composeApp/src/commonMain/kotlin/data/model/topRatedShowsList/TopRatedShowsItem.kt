@@ -1,5 +1,7 @@
 package data.model.topRatedShowsList
 
+import data.model.CardViewData
+import data.model.trendingList.TrendingListItem
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -18,3 +20,13 @@ data class TopRatedShowsItem(
     val vote_average: Double?,
     val vote_count: Int?
 )
+fun TopRatedShowsItem.toCardViewData(): CardViewData {
+    return CardViewData(
+        id = id,
+        media_type = "tv",
+        title =name,
+        poster_path = poster_path,
+        vote_average = vote_average,
+        date = first_air_date
+    )
+}

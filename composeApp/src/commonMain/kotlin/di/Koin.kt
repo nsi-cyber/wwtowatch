@@ -6,30 +6,25 @@ import data.source.ImdbApiService
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.logging.DEFAULT
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.accept
-import io.ktor.client.request.header
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
-import presentation.ExploreScreenModel
+import presentation.exploreScreen.ExploreScreenModel
+import presentation.searchScreen.SearchScreenModel
+import presentation.searchScreen.SearchCard
 
 
-val dataImdbModule = module {
+val networkModule = module {
     single {
         HttpClient {
             defaultRequest {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
-                header("Authorization","Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlNTQ3ODgzOGJjZGFhZDcwYzQyYmI1NGQ4NmM1MjFkZiIsInN1YiI6IjY2NDUyMTgwOTUwMTUxOWM5ZDFjNzQ1YSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.luVDEWJuM2OooZXxsSr5XhlPVtWoHBznfcfe1Bhi7Og")
             }
 
             install(ContentNegotiation) {
@@ -76,6 +71,7 @@ val dataStreamModule = module {
 */
 val screenModelsModule = module {
     factoryOf(::ExploreScreenModel)
+    factoryOf(::SearchScreenModel)
    // factoryOf(::presenta)
    // factoryOf(::DetailScreenModel)
 }
@@ -83,9 +79,8 @@ val screenModelsModule = module {
 fun initKoin() {
     startKoin {
         modules(
-            dataImdbModule,
+            networkModule,
             screenModelsModule,
-           // dataStreamModule
         )
     }
 }
