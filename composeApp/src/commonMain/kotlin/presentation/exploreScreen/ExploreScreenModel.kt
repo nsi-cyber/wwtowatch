@@ -1,109 +1,55 @@
 package presentation.exploreScreen
 
+
 import androidx.compose.runtime.mutableStateOf
-import data.repository.ImdbRepository
-
-
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import data.model.CardViewData
-import data.model.popularMoviesList.toCardViewData
-import data.model.topRatedShowsList.toCardViewData
-import data.model.trendingList.toCardViewData
-
+import domain.useCase.GetPopularMoviesUseCase
+import domain.useCase.GetTopMoviesUseCase
+import domain.useCase.GetTopRatedShowsUseCase
+import domain.useCase.GetTrendingUseCase
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ExploreScreenModel(
-    private val imdbRepository: ImdbRepository
+    private val getPopularMoviesUseCase: GetPopularMoviesUseCase,
+    private val getTopRatedShowsUseCase: GetTopRatedShowsUseCase,
+    private val getTrendingUseCase: GetTrendingUseCase,
+    private val getTopMoviesUseCase: GetTopMoviesUseCase,
 ) :
-    StateScreenModel<ListState>(ListState.Loading) {
+    StateScreenModel<ListState>(ListState.Loading()) {
 
     private var currentPagePopularMovies = mutableStateOf(1)
     private var currentPageTopRatedShows = mutableStateOf(1)
     private var isLoadingPopularMovies = mutableStateOf(false)
     private var isLoadingTopRatedShows = mutableStateOf(false)
 
-    fun getPopularMovies() = screenModelScope.launch {
-        if (isLoadingPopularMovies.value) return@launch
-        isLoadingPopularMovies.value = true
-
-        val result = imdbRepository.getPopularMovies(currentPagePopularMovies.value)
-        val currentState = mutableState.value
-
-        result.onSuccess { movies ->
-            if (movies.isNullOrEmpty()) {
-                mutableState.update { ListState.Empty }
-            } else {
-                val updatedList = if (currentState is ListState.Content) {
-                    val existingMovies = currentState.popularMovies.orEmpty().toMutableList()
-                    existingMovies.addAll(movies)
-                    existingMovies.toList()
-                } else {
-                    movies.toList()
-                }
-                // Check if the state has actually changed before updating
-                if (mutableState.value !is ListState.Content) {
-                    mutableState.update { ListState.Content(popularMovies = updatedList) }
-                } else if (mutableState.value is ListState.Content && (mutableState.value as ListState.Content).popularMovies != updatedList) {
-                    mutableState.update {
-                        ListState.Content(
-                            popularMovies = updatedList,
-                            topRatedShows = (currentState as ListState.Content).topRatedShows,
-                            topRatedMovies = (currentState as ListState.Content).topRatedMovies,
-                            trendingAll = (currentState as ListState.Content).trendingAll
-                        )
-                    }
-                }
-            }
-        }.onFailure { t ->
-            val errorMessage = t.message.orEmpty()
-            println("Error fetching movies: $errorMessage") // Log the error
-            mutableState.update { ListState.ShowError(errorMessage) }
-        }
-
-        isLoadingPopularMovies.value = false
-        currentPagePopularMovies.value += 1
-    }
-
 
     fun getTopRatedShows() = screenModelScope.launch {
         if (isLoadingTopRatedShows.value) return@launch
         isLoadingTopRatedShows.value = true
 
-        val result = imdbRepository.getTopRatedShows(currentPageTopRatedShows.value)
+        val result = getTopRatedShowsUseCase(currentPageTopRatedShows.value)
         val currentState = mutableState.value
 
-        result.onSuccess { movies ->
-            if (movies.isNullOrEmpty()) {
-                mutableState.update { ListState.Empty }
+        result.onSuccess { successResult ->
+            if (successResult.isNullOrEmpty()) {
+                updateLoadingOrEmptyState { it?.copy(topRatedShows = listOf()) }
             } else {
                 val updatedList = if (currentState is ListState.Content) {
-                    val existingShows = currentState.topRatedShows.orEmpty().toMutableList()
-
-                    existingShows.addAll(movies.map { it?.toCardViewData() })
-                    existingShows.toList()
+                    val existingShows = currentState.data?.topRatedShows.orEmpty().toMutableList()
+                    existingShows.addAll(successResult)
+                    existingShows
                 } else {
-                    movies.map { it?.toCardViewData() }.toList()
+                    successResult
                 }
-                // Check if the state has actually changed before updating
-                if (mutableState.value !is ListState.Content) {
-                    mutableState.update { ListState.Content(topRatedShows = updatedList) }
-                } else if (mutableState.value is ListState.Content && (mutableState.value as ListState.Content).topRatedShows != updatedList) {
-                    mutableState.update {
-                        ListState.Content(
-                            popularMovies = (currentState as ListState.Content).popularMovies,
-                            trendingAll = (currentState as ListState.Content).trendingAll,
-                            topRatedMovies = (currentState as ListState.Content).topRatedMovies,
-                            topRatedShows = updatedList
-                        )
-                    }
-                }
+                updateStateWithNewData { it?.copy(topRatedShows = updatedList) }
             }
         }.onFailure { t ->
             val errorMessage = t.message.orEmpty()
-            println("Error fetching movies: $errorMessage")
-            mutableState.update { ListState.ShowError(errorMessage) }
+            println("Error fetching top rated shows: $errorMessage")
+            updateLoadingOrEmptyState { it?.copy(topRatedShows = listOf()) }
         }
 
         isLoadingTopRatedShows.value = false
@@ -111,96 +57,135 @@ class ExploreScreenModel(
     }
 
     fun getTrending() = screenModelScope.launch {
-
-
-        val result = imdbRepository.getTrending()
+        val result = getTrendingUseCase()
         val currentState = mutableState.value
 
-        result.onSuccess { trending ->
-            if (trending.isNullOrEmpty()) {
-                mutableState.update { ListState.Empty }
+        result.onSuccess { successResult ->
+            if (successResult.isNullOrEmpty()) {
+                updateLoadingOrEmptyState { it?.copy(trendingAll = listOf()) }
             } else {
                 val updatedList = if (currentState is ListState.Content) {
-                    val existingTrends = currentState.trendingAll.orEmpty().toMutableList()
-
-                    existingTrends.addAll(trending.map { it?.toCardViewData() })
-                    existingTrends.toList()
+                    val existingTrends = currentState.data?.trendingAll.orEmpty().toMutableList()
+                    existingTrends.addAll(successResult)
+                    existingTrends
                 } else {
-                    trending.map { it?.toCardViewData() }.toList()
+                    successResult
                 }
-                updatedList.filter { it?.media_type != null && it.media_type != "person" }
-                if (mutableState.value !is ListState.Content) {
-                    mutableState.update { ListState.Content(trendingAll = updatedList) }
-                } else if (mutableState.value is ListState.Content && (mutableState.value as ListState.Content).topRatedShows != updatedList) {
-                    mutableState.update {
-                        ListState.Content(
-                            popularMovies = (currentState as ListState.Content).popularMovies,
-                            topRatedShows = (currentState as ListState.Content).topRatedShows,
-                            topRatedMovies = (currentState as ListState.Content).topRatedMovies,
-                            trendingAll = updatedList
-                        )
-                    }
-                }
+                updateStateWithNewData { it?.copy(trendingAll = updatedList) }
             }
         }.onFailure { t ->
             val errorMessage = t.message.orEmpty()
-            println("Error fetching movies: $errorMessage") // Log the error
-            mutableState.update { ListState.ShowError(errorMessage) }
+            println("Error fetching trending: $errorMessage")
+            updateLoadingOrEmptyState { it?.copy(trendingAll = listOf()) }
         }
-
-
     }
+
     fun getTopMovies() = screenModelScope.launch {
-
-
-        val result = imdbRepository.getTopMovies(1)
+        val result = getTopMoviesUseCase(1)
         val currentState = mutableState.value
 
-        result.onSuccess { movies ->
-            if (movies.isNullOrEmpty()) {
-                mutableState.update { ListState.Empty }
+        result.onSuccess { successResult ->
+            if (successResult.isNullOrEmpty()) {
+                updateLoadingOrEmptyState { it?.copy(topRatedMovies = listOf()) }
             } else {
                 val updatedList = if (currentState is ListState.Content) {
-                    val existingTrends = currentState.topRatedMovies.orEmpty().toMutableList()
-
-                    existingTrends.addAll(movies.map { it?.toCardViewData() })
-                    existingTrends.toList()
+                    val existingMovies = currentState.data?.topRatedMovies.orEmpty().toMutableList()
+                    existingMovies.addAll(successResult)
+                    existingMovies
                 } else {
-                    movies.map { it?.toCardViewData() }.toList()
+                    successResult
                 }
-                if (mutableState.value !is ListState.Content) {
-                    mutableState.update { ListState.Content(topRatedMovies = updatedList) }
-                } else if (mutableState.value is ListState.Content && (mutableState.value as ListState.Content).topRatedShows != updatedList) {
-                    mutableState.update {
-                        ListState.Content(
-                            popularMovies = (currentState as ListState.Content).popularMovies,
-                            topRatedShows = (currentState as ListState.Content).topRatedShows,
-                            trendingAll = (currentState as ListState.Content).trendingAll,
-                            topRatedMovies = updatedList
-                        )
-                    }
-                }
+                updateStateWithNewData { it?.copy(topRatedMovies = updatedList) }
             }
         }.onFailure { t ->
             val errorMessage = t.message.orEmpty()
-            println("Error fetching movies: $errorMessage") // Log the error
-            mutableState.update { ListState.ShowError(errorMessage) }
+            println("Error fetching top rated movies: $errorMessage")
+            updateLoadingOrEmptyState { it?.copy(topRatedMovies = listOf()) }
+        }
+    }
+
+
+    fun getPopularMovies() = screenModelScope.launch {
+        if (isLoadingPopularMovies.value) return@launch
+        isLoadingPopularMovies.value = true
+
+        val result = getPopularMoviesUseCase(currentPagePopularMovies.value)
+        val currentState = mutableState.value
+
+        result.onSuccess { successResult ->
+            if (successResult.isNullOrEmpty()) {
+                updateLoadingOrEmptyState { it?.copy(popularMovies = listOf()) }
+            } else {
+                val updatedList = if (currentState is ListState.Content) {
+                    val existingMovies = currentState.data?.popularMovies.orEmpty().toMutableList()
+                    existingMovies.addAll(successResult)
+                    existingMovies
+                } else {
+                    successResult
+                }
+                updateStateWithNewData { it?.copy(popularMovies = updatedList) }
+            }
+        }.onFailure { t ->
+            val errorMessage = t.message.orEmpty()
+            println("Error fetching popular movies: $errorMessage")
+            updateLoadingOrEmptyState { it?.copy(popularMovies = listOf()) }
         }
 
-
+        isLoadingPopularMovies.value = false
+        currentPagePopularMovies.value += 1
     }
+
+    private fun updateLoadingOrEmptyState(update: (ExploreScreenData?) -> ExploreScreenData?) {
+        if (mutableState.value is ListState.Loading) {
+            val updatedData = update((mutableState.value as ListState.Loading).data)
+            mutableState.update { ListState.Loading(data = updatedData) }
+            if (updatedData.isContent()) {
+                mutableState.update { ListState.Content(data = updatedData) }
+            }
+        } else {
+            val updatedData = update(null)
+            mutableState.update { ListState.Loading(data = updatedData) }
+            if (updatedData.isContent()) {
+                mutableState.update { ListState.Content(data = updatedData) }
+            }
+        }
+    }
+
+    private fun updateStateWithNewData(update: (ExploreScreenData?) -> ExploreScreenData?) {
+        if (mutableState.value is ListState.Loading) {
+            val updatedData = update((mutableState.value as ListState.Loading).data)
+            mutableState.update { ListState.Loading(data = updatedData) }
+            if (updatedData.isContent()) {
+                mutableState.update { ListState.Content(data = updatedData) }
+            }
+        } else {
+            val updatedData = update((mutableState.value as ListState.Content).data)
+            mutableState.update { ListState.Content(data = updatedData) }
+        }
+    }
+
 
 }
 
 sealed interface ListState {
-    data object Loading : ListState
-    data object Empty : ListState
-    data class Content(
-        val popularMovies: List<CardViewData?>? = null,
-        val topRatedShows: List<CardViewData?>? = null,
-        val topRatedMovies: List<CardViewData?>? = null,
-        val trendingAll: List<CardViewData?>? = null,
+    data class Loading(
+        val data: ExploreScreenData? = ExploreScreenData()
     ) : ListState
 
-    data class ShowError(val message: String?) : ListState
+    data class Content(
+        val data: ExploreScreenData? = ExploreScreenData()
+    ) : ListState
+
+}
+
+data class ExploreScreenData(
+    val popularMovies: List<CardViewData?>? = null,
+    val topRatedShows: List<CardViewData?>? = null,
+    val topRatedMovies: List<CardViewData?>? = null,
+    val trendingAll: List<CardViewData?>? = null,
+)
+
+
+fun ExploreScreenData?.isContent(): Boolean {
+    return this?.trendingAll != null
 }

@@ -1,86 +1,98 @@
 package di
 
 
-import data.repository.ImdbRepository
-import data.source.ImdbApiService
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.request.accept
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
+import SearchScreenModel
+import data.remote.ImdbApiService
+import data.repository.ImdbRepositoryImpl
+import domain.repository.ImdbRepository
+import domain.useCase.GetMovieCreditsUseCase
+import domain.useCase.GetMovieDetailUseCase
+import domain.useCase.GetMovieGenreListUseCase
+import domain.useCase.GetMovieImagesUseCase
+import domain.useCase.GetMovieProvidersUseCase
+import domain.useCase.GetMovieSimilarUseCase
+import domain.useCase.GetMovieVideosUseCase
+import domain.useCase.GetPopularMoviesUseCase
+import domain.useCase.GetSearchResultsUseCase
+import domain.useCase.GetTopMoviesUseCase
+import domain.useCase.GetTopRatedShowsUseCase
+import domain.useCase.GetTrendingUseCase
+import domain.useCase.GetTvGenreListUseCase
 import org.koin.core.context.startKoin
 import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
+import presentation.detailScreen.movieDetailScreen.MovieDetailScreenModel
 import presentation.exploreScreen.ExploreScreenModel
-import presentation.searchScreen.SearchScreenModel
-import presentation.searchScreen.SearchCard
 
 
 val networkModule = module {
-    single {
-        HttpClient {
-            defaultRequest {
-                contentType(ContentType.Application.Json)
-                accept(ContentType.Application.Json)
-            }
-
-            install(ContentNegotiation) {
-                json(
-                    Json {
-                        prettyPrint = true
-                        ignoreUnknownKeys = true
-                    }
-                )
-            }
-        }
-    }
-
-    single<ImdbApiService> { ImdbApiService(get()) }
-    single { ImdbRepository(get()) }
+    single<ImdbApiService> { ImdbApiService() }
+    single<ImdbRepository> { ImdbRepositoryImpl(get()) }
 }
-/*
-val dataStreamModule = module {
-    single {
-        HttpClient {
-            defaultRequest {
-                contentType(ContentType.Application.Json)
-                accept(ContentType.Application.Json)
-            }
+val useCaseModule = module {
+    factoryOf(::GetPopularMoviesUseCase)
+    factoryOf(::GetSearchResultsUseCase)
+    factoryOf(::GetTopMoviesUseCase)
+    factoryOf(::GetTopRatedShowsUseCase)
+    factoryOf(::GetTrendingUseCase)
+    factoryOf(::GetMovieGenreListUseCase)
+    factoryOf(::GetTvGenreListUseCase)
 
-            install(ContentNegotiation) {
-                json(
-                    Json {
-                        prettyPrint = true
-                        ignoreUnknownKeys = true
-                    }
-                )
-            }
-            install(Logging) {
-                logger = Logger.DEFAULT
-                level = LogLevel.ALL
-            }
-        }
-    }
 
-    single<ImdbApiService> { ImdbApiService(get()) }
-    single { ImdbRepository(get()) }
+    factoryOf(::GetMovieDetailUseCase)
+    factoryOf(::GetMovieVideosUseCase)
+    factoryOf(::GetMovieSimilarUseCase)
+    factoryOf(::GetMovieProvidersUseCase)
+    factoryOf(::GetMovieCreditsUseCase)
+    factoryOf(::GetMovieImagesUseCase)
 }
-*/
 val screenModelsModule = module {
     factoryOf(::ExploreScreenModel)
     factoryOf(::SearchScreenModel)
-   // factoryOf(::presenta)
-   // factoryOf(::DetailScreenModel)
+    factoryOf(::MovieDetailScreenModel)
 }
+
+
 
 fun initKoin() {
     startKoin {
         modules(
-            networkModule,
-            screenModelsModule,
+            networkModule, useCaseModule,
+            screenModelsModule
         )
     }
 }
+
+
+/*
+
+val dataModule = module {
+    single<ValorantService> { ValorantService() }
+    single<ValorantRepository> { ValorantRepositoryImpl(get()) }
+}
+
+val useCaseModule = module {
+    factoryOf(::GetAgentsUseCase)
+    factoryOf(::GetAgentDetailUseCase)
+    factoryOf(::GetCompetitiveTiersUseCase)
+    factoryOf(::GetMapsUseCase)
+    factoryOf(::GetMapDetailUseCase)
+    factoryOf(::GetWeaponsUseCase)
+    factoryOf(::GetWeaponDetailUseCase)
+}
+
+val screenModelsModule = module {
+    factoryOf(::AgentsScreenModel)
+    factoryOf(::AgentDetailScreenModel)
+    factoryOf(::CompetitiveTiersScreenModel)
+    factoryOf(::MapsScreenModel)
+    factoryOf(::MapDetailScreenModel)
+    factoryOf(::WeaponsScreenModel)
+    factoryOf(::WeaponDetailScreenModel)
+}
+
+fun initKoin() = startKoin { modules(dataModule, useCaseModule, screenModelsModule) }
+
+
+
+ */

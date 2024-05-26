@@ -1,6 +1,4 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-
-        plugins {
+plugins {
             alias(libs.plugins.kotlinMultiplatform)
             alias(libs.plugins.androidApplication)
             alias(libs.plugins.jetbrainsCompose)
@@ -38,6 +36,7 @@ kotlin {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
+
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -57,7 +56,12 @@ kotlin {
             implementation(libs.koin.core)
 
             implementation(libs.voyager.navigator)
+            implementation(libs.voyager.transitions)
             implementation(libs.voyager.koin)
+
+
+            implementation("com.vanniktech:multiplatform-locale:0.7.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
@@ -105,4 +109,5 @@ android {
         debugImplementation(libs.compose.ui.tooling)
     }
 }
+
 

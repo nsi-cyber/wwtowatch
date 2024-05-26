@@ -1,19 +1,16 @@
 package data.model
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-
 data class CardViewData(
 
-val id: Int?,
+val id: Int?=null,
 
-val media_type: String?,
+val media_type: String?=null,
 
 val title: String?=null,
 
-val poster_path: String?,
+val poster_path: String?=null,
 
-val vote_average: Double?,
+val vote_average: Double?=null,
 val date: String?=null,
 
 )

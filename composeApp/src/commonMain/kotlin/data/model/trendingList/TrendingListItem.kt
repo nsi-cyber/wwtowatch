@@ -13,7 +13,7 @@ data class TrendingListItem(
     val id: Int,
     @SerialName("media_type")
 
-    val media_type: String,
+    val media_type: String?,
 
     @SerialName("name")
     val name: String? = null,

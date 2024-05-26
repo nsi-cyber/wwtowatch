@@ -1,7 +1,6 @@
 package data.model.searchResultList
 
 import data.model.CardViewData
-import data.model.trendingList.TrendingListItem
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

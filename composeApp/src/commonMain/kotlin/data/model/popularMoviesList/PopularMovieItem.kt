@@ -1,7 +1,6 @@
 package data.model.popularMoviesList
 
 import data.model.CardViewData
-import data.model.trendingList.TrendingListItem
 import kotlinx.serialization.Serializable
 
 @Serializable

@@ -19,15 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -35,19 +26,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.core.screen.ScreenKey
+import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import data.Constants.IMAGE_URL
 import data.model.CardViewData
 import io.kamel.image.KamelImage
@@ -57,12 +57,19 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import presentation.components.AutoScrollerHorizontalPagerView
 import presentation.components.shimmerEffect
+import presentation.detailScreen.movieDetailScreen.MovieDetailScreen
 import presentation.searchScreen.SearchScreen
+import primaryColor
 import ww_to_watch.composeapp.generated.resources.Res
 import ww_to_watch.composeapp.generated.resources.ic_search
 
 
 data object ExploreScreen : Screen {
+
+    override val key: ScreenKey
+        get() = "ExploreScreen"
+
+
     @OptIn(ExperimentalResourceApi::class)
     @Composable
     override fun Content() {
@@ -80,19 +87,22 @@ data object ExploreScreen : Screen {
         }
 
         when (state) {
-            ListState.Loading, ListState.Empty, is ListState.ShowError -> Unit
+            is ListState.Loading -> {}
 
             is ListState.Content -> {
 
                 Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState())
-                        .background(Color.White)
+                    modifier = Modifier.background(primaryColor).verticalScroll(rememberScrollState())
+
                 ) {
-                    (state as ListState.Content).trendingAll?.let { trending ->
+
+
+                    (state as ListState.Content).data?.trendingAll?.let { trending ->
 
                         Box(modifier = Modifier.padding(bottom = 24.dp)) {
                             AutoScrollerHorizontalPagerView(list = trending) {
-                                //detail
+                                if (it.media_type == "movie")
+                                    navigator.push(MovieDetailScreen(it.id))
                             }
 
                             Box(contentAlignment = Alignment.Center,
@@ -108,7 +118,7 @@ data object ExploreScreen : Screen {
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = "Search for Movies & Shows...",
+                                        text = "Discover Movies & Shows...",
                                         color = Color.Black,
                                         fontSize = 18.sp,
                                         textAlign = TextAlign.Start,
@@ -129,22 +139,27 @@ data object ExploreScreen : Screen {
 
 
 
-                    (state as ListState.Content).popularMovies?.let { movieList ->
-                        MovieListContent(list = movieList, onItemClick = { id ->
-                            // navigator.push(DetailScreen(id))
-                        }, pagination = {
-                            screenModel.getPopularMovies()
-                        })
+
+                    if ((state as ListState.Content).data?.popularMovies == null || (state as ListState.Content).data?.popularMovies?.isNotEmpty() == true) {
+
+                        MovieListContent(
+                            list = (state as ListState.Content).data?.popularMovies,
+                            onItemClick = { id ->
+                                navigator.push(MovieDetailScreen(id))
+                            },
+                            pagination = {
+                                screenModel.getPopularMovies()
+                            })
 
                     }
 
+                    if ((state as ListState.Content).data?.topRatedShows == null || (state as ListState.Content).data?.topRatedShows?.isNotEmpty() == true) {
 
-                    (state as ListState.Content).topRatedShows?.let { showList ->
 
                         RankedListContent(
                             title = "Top 10 Shows",
                             subtitle = "This Week",
-                            list = showList,
+                            list = (state as ListState.Content).data?.topRatedShows,
                             onItemClick = { id ->
                                 // navigator.push(DetailScreen(id))
                             })
@@ -152,19 +167,20 @@ data object ExploreScreen : Screen {
 
                     }
 
+                    if ((state as ListState.Content).data?.topRatedMovies == null || (state as ListState.Content).data?.topRatedMovies?.isNotEmpty() == true) {
 
-                    (state as ListState.Content).topRatedMovies?.let { showList ->
 
                         RankedListContent(
                             title = "Top 10 Movies",
                             subtitle = "of All Time",
-                            list = showList,
+                            list = (state as ListState.Content).data?.topRatedMovies,
                             onItemClick = { id ->
-                                // navigator.push(DetailScreen(id))
+                                navigator.push(MovieDetailScreen(id))
                             })
 
 
                     }
+
 
                 }
             }
@@ -176,14 +192,17 @@ data object ExploreScreen : Screen {
 }
 
 @Composable
-private fun MovieListContent(
-    list: List<CardViewData?>?, onItemClick: (Int) -> Unit, pagination: () -> Job?
+fun MovieListContent(
+    title: String? = "Popular", subtitle: String? = "Movies", rowCount: Int = 2,
+    list: List<CardViewData?>?, onItemClick: (Int) -> Unit, pagination: () -> Job? = { null }
 ) {
     val lazyGridState = rememberLazyGridState()
+    val shimmerModifier: Modifier = Modifier.shimmerEffect()
+
     Column() {
         Column(modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)) {
             Text(
-                text = "Popular",
+                text = title ?: "",
                 color = Color.Gray,
                 fontSize = 22.sp,
                 textAlign = TextAlign.Start,
@@ -191,8 +210,8 @@ private fun MovieListContent(
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                text = "Movies",
-                color = Color.Black,
+                text = subtitle ?: "",
+                color = Color.White,
                 fontSize = 28.sp,
                 textAlign = TextAlign.Start,
                 fontWeight = FontWeight.Bold,
@@ -202,25 +221,32 @@ private fun MovieListContent(
 
         LazyHorizontalGrid(
             state = lazyGridState,
-            rows = GridCells.Fixed(2),
-            modifier = Modifier.height(400.dp),
+            rows = GridCells.Fixed(rowCount),
+            modifier = Modifier.height(if (rowCount == 2) 400.dp else 200.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-
-            items(list!!) { movie ->
-                MovieCard(
-                    movie = movie, onItemClick = onItemClick
-                )
-                lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let {
-                    if (it + 10 > (list.size)) {
-                        LaunchedEffect(Unit) {
-                            pagination()
+            if (list.isNullOrEmpty()) {
+                items(9) {
+                    MovieCard(
+                        modifier = shimmerModifier
+                    )
+                }
+            } else {
+                items(list) { movie ->
+                    MovieCard(
+                        movie = movie, onItemClick = onItemClick
+                    )
+                    lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let {
+                        if (it + 10 > (list.size)) {
+                            LaunchedEffect(Unit) {
+                                pagination()
+                            }
                         }
                     }
-                }
 
+                }
             }
         }
     }
@@ -233,6 +259,8 @@ private fun RankedListContent(
     title: String?, subtitle: String?,
     list: List<CardViewData?>?, onItemClick: (Int) -> Unit
 ) {
+    val shimmerModifier: Modifier = Modifier.shimmerEffect()
+
     val lazyGridState = rememberLazyGridState()
     Column(
     ) {
@@ -247,7 +275,7 @@ private fun RankedListContent(
             )
             Text(
                 text = subtitle.orEmpty(),
-                color = Color.Black,
+                color = Color.White,
                 fontSize = 28.sp,
                 textAlign = TextAlign.Start,
                 fontWeight = FontWeight.Bold,
@@ -264,10 +292,19 @@ private fun RankedListContent(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
 
-            itemsIndexed(items = list!!.take(10)) { position, data ->
-                RankedCard(
-                    position = position + 1, data = data, onItemClick = onItemClick
-                )/*
+
+            if (list.isNullOrEmpty()) {
+                items(10) {
+                    RankedCard(
+                        modifier = shimmerModifier,
+                    )
+                }
+
+            } else {
+                itemsIndexed(items = list.take(10)) { position, data ->
+                    RankedCard(
+                        position = position + 1, data = data, onItemClick = onItemClick
+                    )/*
                 lazyGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let {
                     if (it + 10 > (list.size)) {
                         LaunchedEffect(Unit) {
@@ -276,6 +313,7 @@ private fun RankedListContent(
                     }
                 }*/
 
+                }
             }
         }
     }
@@ -285,10 +323,11 @@ private fun RankedListContent(
 
 @Composable
 fun RankedCard(
-    position: Int, data: CardViewData?, onItemClick: (Int) -> Unit
+    modifier: Modifier = Modifier,
+    position: Int? = null, data: CardViewData? = null, onItemClick: (Int) -> Unit = {}
 ) {
 
-    Row(modifier = Modifier.width(330.dp)
+    Row(modifier = modifier.width(330.dp)
 
         .clickable {
             onItemClick(data?.id ?: -1)
@@ -309,7 +348,7 @@ fun RankedCard(
             resource = asyncPainterResource(data = "${IMAGE_URL}${data?.poster_path}"),
             contentDescription = data?.title,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(width = 100.dp, height = 125.dp).background(Color.White)
+            modifier = modifier.size(width = 100.dp, height = 125.dp)
                 .aspectRatio(4 / 5f)
                 .shadow(5.dp, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
 
@@ -322,20 +361,21 @@ fun RankedCard(
 
             Text(
                 text = "$position.",
-                color = Color.Black,
+                color = Color.White,
                 fontSize = 28.sp,
                 textAlign = TextAlign.Start,
                 fontWeight = FontWeight.Bold,
+                modifier = modifier,
             )
 
             Text(
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
                 text = data?.title.orEmpty(),
-                color = Color.Black,
+                color = Color.White,
                 fontSize = 25.sp,
                 textAlign = TextAlign.Start,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.width(190.dp)
+                modifier = modifier.width(190.dp)
             )
 
             Text(
@@ -344,6 +384,7 @@ fun RankedCard(
                 fontSize = 20.sp,
                 textAlign = TextAlign.Start,
                 fontWeight = FontWeight.Medium,
+                modifier = modifier,
             )
 
         }
@@ -355,11 +396,12 @@ fun RankedCard(
 
 @Composable
 fun MovieCard(
-    movie: CardViewData?, onItemClick: (Int) -> Unit
+    modifier: Modifier = Modifier,
+    movie: CardViewData? = null, onItemClick: (Int) -> Unit = {}
 ) {
 
     Box(contentAlignment = Alignment.Center,
-        modifier = Modifier.shadow(5.dp, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
+        modifier = modifier.shadow(5.dp, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
             .aspectRatio(4 / 5f).clickable {
                 onItemClick(movie?.id ?: -1)
             }
@@ -378,15 +420,15 @@ fun MovieCard(
             resource = asyncPainterResource(data = "${IMAGE_URL}${movie?.poster_path}"),
             contentDescription = movie?.title,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().background(Color(0xFFB8B5B5)).drawWithCache {
+            modifier = modifier.fillMaxSize().background(Color(0xFFB8B5B5)).drawWithCache {
                 val gradient = Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black),
+                    colors = listOf(Color.Transparent, primaryColor),
                     startY = size.height / 2,
                     endY = size.height
                 )
                 onDrawWithContent {
                     drawContent()
-                    drawRect(gradient, blendMode = BlendMode.Multiply)
+                    drawRect(gradient)
                 }
             })
 
@@ -396,7 +438,7 @@ fun MovieCard(
             fontSize = 14.sp,
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
+            modifier = modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
         )
 
 

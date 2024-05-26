@@ -1,53 +1,76 @@
-package presentation.searchScreen
-
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import data.model.CardViewData
-import data.model.searchResultList.SearchResultItem
-import data.model.searchResultList.toCardViewData
-import data.repository.ImdbRepository
+import data.model.genreKeywordList.Genre
+import domain.useCase.GetMovieGenreListUseCase
+import domain.useCase.GetSearchResultsUseCase
+import domain.useCase.GetTvGenreListUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-
 class SearchScreenModel(
-    private val imdbRepository: ImdbRepository
+    private val getSearchResultsUseCase: GetSearchResultsUseCase,
+    private val getMovieGenreListUseCase: GetMovieGenreListUseCase,
+    private val getTvGenreListUseCase: GetTvGenreListUseCase,
 ) :
-    StateScreenModel<SearchState>(SearchState.Empty) {
+    StateScreenModel<SearchState>(SearchState.Loading(SearchScreenData())) {
 
-    private var isLoadingSearch = mutableStateOf(false)
+     var isLoadingSearch = mutableStateOf(false)
 
     private var searchJob: Job? = null
 
 
-    fun setStateEmpty(){
-        mutableState.update { SearchState.Empty }
-    }
-    fun getSearchResults(query:String) = screenModelScope.launch {
+    fun getMovieGenreList() = screenModelScope.launch {
+        val result = getMovieGenreListUseCase()
 
-        isLoadingSearch.value = true
-
-        val result = imdbRepository.getSearchResults(query,1)
-
-        result.onSuccess { searchResult ->
-            if (searchResult.isNullOrEmpty()) {
-                mutableState.update { SearchState.Empty }
+        result.onSuccess { successResult ->
+            if (successResult.isNullOrEmpty()) {
+                updateState { it?.copy(movieGenreList = listOf()) }
             } else {
-
-                    mutableState.update { SearchState.Content(searchResult = searchResult.filter { !it?.media_type.isNullOrEmpty() &&it?.media_type!="person" }.map { it?.toCardViewData() }) }
-
+                updateState { it?.copy(movieGenreList = successResult) }
             }
         }.onFailure { t ->
             val errorMessage = t.message.orEmpty()
+            println("Error fetching getMovieGenreList: $errorMessage")
+            updateState { it?.copy(movieGenreList = listOf()) }
+        }
+    }
+
+    fun getTvGenreList() = screenModelScope.launch {
+        val result = getTvGenreListUseCase()
+
+        result.onSuccess { successResult ->
+            if (successResult.isNullOrEmpty()) {
+                updateState { it?.copy(tvGenreList = listOf()) }
+            } else {
+                updateState { it?.copy(tvGenreList = successResult) }
+            }
+        }.onFailure { t ->
+            val errorMessage = t.message.orEmpty()
+            println("Error fetching getTvGenreList: $errorMessage")
+            updateState { it?.copy(tvGenreList = listOf()) }
+        }
+    }
+
+    fun getSearchResults(query: String) = screenModelScope.launch {
+        isLoadingSearch.value = true
+
+        val result = getSearchResultsUseCase(query, 1)
+
+        result.onSuccess { successResult ->
+            updateState { it?.copy(searchResult = successResult) }
+        }.onFailure { t ->
+            val errorMessage = t.message.orEmpty()
             println("Error fetching movies: $errorMessage") // Log the error
-            mutableState.update { SearchState.ShowError(errorMessage) }
+            updateState { it?.copy(searchResult = listOf()) }
         }
 
         isLoadingSearch.value = false
     }
+
     fun searchWithDebounce(query: String) {
         searchJob?.cancel()
         searchJob = screenModelScope.launch {
@@ -56,16 +79,48 @@ class SearchScreenModel(
         }
     }
 
+    fun setStateEmpty() {
+        searchJob?.cancel()
+        if (mutableState.value is SearchState.Content)
+            mutableState.update {
+                SearchState.Empty(data = (mutableState.value as SearchState.Content).data)
+            }
+    }
 
+    private fun updateState(update: (SearchScreenData?) -> SearchScreenData?) {
+        if (mutableState.value is SearchState.Loading) {
+            val updatedData = update((mutableState.value as SearchState.Loading).data)
+
+                mutableState.update { SearchState.Empty(data = updatedData) }
+
+
+
+        } else
+            if (mutableState.value is SearchState.Content) {
+                val updatedData = update((mutableState.value as SearchState.Content).data)
+                mutableState.update { SearchState.Content(data = updatedData) }
+
+            } else
+                if (mutableState.value is SearchState.Empty) {
+                    val updatedData = update((mutableState.value as SearchState.Empty).data)
+                    mutableState.update { SearchState.Empty(data = updatedData) }
+                    if ((mutableState.value as SearchState.Empty).data?.searchResult != null) { mutableState.update { SearchState.Content(data = updatedData) }
+                    }
+                }
+
+    }
 }
 
-sealed interface SearchState {
-    data object Loading : SearchState
-    data object Empty : SearchState
-    data class Content(
-        val searchResult: List<CardViewData?>? = null,
-    ) : SearchState
-
-    data class ShowError(val message: String?) : SearchState
+sealed class SearchState {
+    data class Loading(val data: SearchScreenData?) : SearchState()
+    data class Empty(val data: SearchScreenData?) : SearchState()
+    data class Content(val data: SearchScreenData?) : SearchState()
 }
+
+data class SearchScreenData(
+    val searchResult: List<CardViewData?>? = null,
+    val tvGenreList: List<Genre?>? = null,
+    val movieGenreList: List<Genre?>? = null
+)
+
 

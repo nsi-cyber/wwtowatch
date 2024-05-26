@@ -1,5 +1,9 @@
 package data.model.movieDetail
 
+import kotlinx.serialization.Serializable
+
+@Serializable
+
 data class ProductionCompany(
     val id: Int,
     val logo_path: String,
